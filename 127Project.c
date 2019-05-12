@@ -14,8 +14,6 @@
 #include "driverlib/pwm.h"
 #include "driverlib/adc.h"
 #include "driverlib/interrupt.h"
-#include "driverlib/systick.h"
-
 #include "inc/tm4c123gh6pm.h"
 
 
@@ -93,44 +91,31 @@ void PortFunctionInit(void)
 	GPIOPinTypeADC(GPIO_PORTE_BASE, GPIO_PIN_2);
 	GPIOPinTypeADC(GPIO_PORTE_BASE, GPIO_PIN_1);
 }
-void SysTick_Init(unsigned long period)
-{
-	SysTickDisable(); //disable SysTick timer when setup
-	SysTickPeriodSet(period); //set reload value to the counter
-	SysTickIntEnable(); //enable SysTick interrupt
-	SysTickEnable(); //enable the SysTick timer 
-}
-void SysTick_Handler(void)
-{
-	ADCProcessorTrigger(ADC0_BASE, 0);
-	ADCSequenceDataGet(ADC0_BASE, 0, ui32ADC0Value); //Grab the Entire FIFO
-	//looks like all we really need is one for each;
-	ui32Right = ((ui32ADC0Value[0] + ui32ADC0Value[1] + ui32ADC0Value[2])/3);
-	ui32Straight = ((ui32ADC0Value[6] + ui32ADC0Value[7])/2);
-	ui32Left = ((ui32ADC0Value[3] + ui32ADC0Value[4] + ui32ADC0Value[5])/3);
-}
 
 int main(void)
 {
-	unsigned long period = 1600;
+	int count = 0;
 	PortFunctionInit();
 	ADC0_Init();
 	pwmInit();
-	SysTick_Init(period);
 	IntMasterEnable();
 	ADCProcessorTrigger(ADC0_BASE, 0);
 	
 	while(1)
 	{
-		//ADCIntClear(ADC0_BASE, 0);
+		ADCIntClear(ADC0_BASE, 0);
+		ADCProcessorTrigger(ADC0_BASE, 0);
+		while(!ADCIntStatus(ADC0_BASE, 0, false))
+		{
+		}
+		ADCSequenceDataGet(ADC0_BASE, 0, ui32ADC0Value); //Grab the Entire FIFO
+		//looks like all we really need is one for each;
+		ui32Right = ui32ADC0Value[0];
+		ui32Straight = ui32ADC0Value[5];
+		ui32Left = ui32ADC0Value[3];
 		
-		//while(!ADCIntStatus(ADC0_BASE, 0, false))
-		//{
-		//},
 		
-		
-		
-		if(ui32Straight > 1500)
+		if(ui32Straight > 2000)
 		{
 			turning_left = false;
 			turning_right = false;
@@ -139,7 +124,7 @@ int main(void)
 			SysCtlDelay(100);
 		}
 		//turn left
-		else if(ui32Left > 1500)
+		else if(ui32Left > 2000)
 		{
 			turning_left = true;
 			turning_right = false;
@@ -147,7 +132,7 @@ int main(void)
 			PWMPulseWidthSet(PWM1_BASE, PWM_OUT_1, 800);
 		}
 		//turn right
-		else if(ui32Right > 1500)
+		else if(ui32Right > 2000)
 		{
 			turning_left = false;
 			turning_right = true;
